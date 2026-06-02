@@ -1,47 +1,56 @@
 import streamlit as st
 import pandas as pd
-import os
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
-# Konfigurasi Page
-st.set_page_config(page_title="Dashboard Inventaris Laptop", layout="wide")
-
-st.title("💻 Dashboard Pendataan Laptop Office")
-
-# Fungsi untuk mencari dan load file otomatis
+# Load data
+@st.cache_data
 def load_data():
-    # Mencari file yang berakhiran .xlsx
-    files = [f for f in os.listdir('.') if f.endswith('.xlsx')]
-    if not files:
-        st.error("File Excel (.xlsx) tidak ditemukan di folder ini! Pastikan file sudah diupload.")
-        return None
-    
-    # Ambil file pertama yang ketemu
-    file_path = files[0]
-    st.write(f"Membaca file: **{file_path}**") # Memastikan file apa yang dibaca
-    
-    df = pd.read_excel(file_path, sheet_name=0) # Membaca sheet pertama
+    df = pd.read_excel("laporan laptop terbaru (1).xlsx", sheet_name=0)
     df.columns = df.columns.str.strip()
-    df = df.fillna("-")
-    return df
+    return df.fillna("-")
 
 df = load_data()
 
-if df is not None:
-    # Sidebar Filter
-    status_filter = st.sidebar.multiselect("Pilih Status:", options=df["Status"].unique(), default=df["Status"].unique())
-    df_filtered = df[df["Status"].isin(status_filter)]
+st.title("💻 Dashboard Laptop Office Pro")
 
-    # Metrics
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Unit", len(df))
-    col2.metric("Di Pakai", len(df[df["Status"] == "Di Pakai"]))
-    col3.metric("Rusak", len(df[df["Status"] == "Rusak"]))
-    col4.metric("Tersedia", len(df[df["Status"] == "Tersedia"]))
+# --- CHART SECTION ---
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("Distribusi Status")
+    st.bar_chart(df["Status"].value_counts())
+with col2:
+    st.subheader("Top Model Laptop")
+    st.bar_chart(df["Model"].value_counts().head(5))
 
-    # Tabel
-    def highlight_status(row):
-        color = 'background-color: #ffcccc' if row['Status'] == 'Rusak' else ('background-color: #fff3cc' if row['Status'] == 'Perlu Perbaikan' else '')
-        return [color] * len(row)
+# --- DATA EDITOR (CRUD) ---
+st.subheader("Edit Data Inventaris")
+st.write("Anda bisa edit data langsung di tabel bawah ini. Perubahan akan tersimpan di sesi ini.")
 
-    st.subheader("Data Inventaris")
-    st.dataframe(df_filtered.style.apply(highlight_status, axis=1), use_container_width=True)
+# Grid Options untuk AgGrid
+gb = GridOptionsBuilder.from_dataframe(df)
+gb.configure_default_column(editable=True) # Aktifkan fitur edit
+gb.configure_selection('single')
+gridOptions = gb.build()
+
+# Tampilkan Grid
+grid_response = AgGrid(
+    df,
+    gridOptions=gridOptions,
+    update_mode=GridUpdateMode.VALUE_CHANGED,
+    height=400,
+    use_container_width=True
+)
+
+# Simpan hasil edit
+df_updated = pd.DataFrame(grid_response['data'])
+
+# Tombol Tambah & Hapus
+col_btn1, col_btn2 = st.columns(2)
+if col_btn1.button("Tambah Baris Baru"):
+    new_row = pd.DataFrame([["-"] * len(df.columns)], columns=df.columns)
+    df = pd.concat([df, new_row], ignore_index=True)
+    st.rerun()
+
+if col_btn2.button("Simpan Perubahan ke Excel"):
+    df_updated.to_excel("laporan laptop terbaru (1).xlsx", index=False)
+    st.success("Data berhasil disimpan!")
