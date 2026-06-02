@@ -1,39 +1,69 @@
 import streamlit as st
 import pandas as pd
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+import os
 
-# Konfigurasi Page
-st.set_page_config(page_title="Dashboard Aset Laptop", layout="wide")
+# Konfigurasi Halaman
+st.set_page_config(page_title="Dashboard Inventaris IT", layout="wide")
+st.title("💻 Dashboard Inventaris Laptop - Umara Group")
 
-st.title("💻 Dashboard Pendataan Laptop Office")
-st.write("Pantau status inventaris laptop kantor secara real-time.")
+# Nama file
+FILE_NAME = "laporan laptop terbaru (1).xlsx"
 
-# Load Data
+# Fungsi Load Data
 @st.cache_data
 def load_data():
-    df = pd.read_excel("laporan laptop terbaru (1).xlsx", sheet_name='laporan laptop')
-    df.columns = df.columns.str.strip() # Bersihkan spasi di nama kolom
-    return df
+    if not os.path.exists(FILE_NAME):
+        st.error(f"File {FILE_NAME} tidak ditemukan!")
+        return None
+    df = pd.read_excel(FILE_NAME, sheet_name=0)
+    df.columns = df.columns.str.strip()
+    return df.fillna("-")
 
 df = load_data()
 
-# Sidebar untuk Filter
-st.sidebar.header("Filter Data")
-status_filter = st.sidebar.multiselect("Pilih Status:", options=df["Status"].unique(), default=df["Status"].unique())
+if df is not None:
+    # 1. CHART SECTION
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Distribusi Status")
+        status_counts = df["Status"].value_counts()
+        st.bar_chart(status_counts)
+    with col2:
+        st.subheader("Model Laptop Terbanyak")
+        model_counts = df["Model"].value_counts().head(10)
+        st.bar_chart(model_counts)
 
-# Filter data berdasarkan pilihan
-df_filtered = df[df["Status"].isin(status_filter)]
+    # 2. CRUD SECTION (AgGrid)
+    st.subheader("Data Inventaris (Edit Langsung)")
+    
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_default_column(editable=True) # Aktifkan fitur edit di semua kolom
+    gb.configure_selection('single')
+    gridOptions = gb.build()
 
-# Tampilan Ringkasan (Metrics)
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Unit", len(df))
-col2.metric("Di Pakai", len(df[df["Status"] == "Di Pakai"]))
-col3.metric("Rusak", len(df[df["Status"] == "Rusak"]))
-col4.metric("Tersedia", len(df[df["Status"] == "Tersedia"]))
+    grid_response = AgGrid(
+        df,
+        gridOptions=gridOptions,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        height=400,
+        use_container_width=True
+    )
 
-# Tampilkan Tabel
-st.subheader("Data Inventaris")
-st.dataframe(df_filtered, use_container_width=True)
+    df_updated = pd.DataFrame(grid_response['data'])
 
-# Visualisasi Sederhana
-st.subheader("Distribusi Status Laptop")
-st.bar_chart(df["Status"].value_counts())
+    # 3. TOMBOL TAMBAH & SIMPAN
+    col_btn1, col_btn2 = st.columns(2)
+    
+    if col_btn1.button("➕ Tambah Baris Baru"):
+        new_row = pd.DataFrame([["-"] * len(df.columns)], columns=df.columns)
+        df = pd.concat([df, new_row], ignore_index=True)
+        st.rerun()
+
+    if col_btn2.button("💾 Simpan Perubahan"):
+        try:
+            df_updated.to_excel(FILE_NAME, index=False)
+            st.success("Data berhasil disimpan ke Excel!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Gagal simpan: {e}. Pastikan file Excel tidak sedang terbuka!")
