@@ -51,6 +51,21 @@ if col_btn1.button("Tambah Baris Baru"):
     df = pd.concat([df, new_row], ignore_index=True)
     st.rerun()
 
+import os
+
 if col_btn2.button("Simpan Perubahan ke Excel"):
-    df_updated.to_excel("laporan laptop terbaru (1).xlsx", index=False)
-    st.success("Data berhasil disimpan!")
+    file_name = "laporan laptop terbaru (1).xlsx"
+    try:
+        # Kita buat nama file sementara untuk memastikan data aman sebelum menimpa file asli
+        temp_file = "temp_data.xlsx"
+        df_updated.to_excel(temp_file, index=False)
+        
+        # Hapus file lama dan ganti dengan file baru
+        if os.path.exists(file_name):
+            os.remove(file_name)
+        os.rename(temp_file, file_name)
+        
+        st.success("Data berhasil disimpan!")
+        st.rerun() # Refresh dashboard untuk memuat data baru
+    except Exception as e:
+        st.error(f"Gagal menyimpan: {e}. Pastikan folder tidak di-read only.")
