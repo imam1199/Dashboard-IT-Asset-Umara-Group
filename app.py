@@ -9,14 +9,22 @@ st.title("💻 Dashboard Pendataan Laptop Office")
 st.write("Pantau status inventaris laptop kantor secara real-time.")
 
 # Fungsi Load Data
+import os
+
 @st.cache_data
 def load_data():
-    df = pd.read_excel("laporan laptop terbaru (1).xlsx", sheet_name='laporan laptop')
-    df.columns = df.columns.str.strip() # Bersihkan spasi di nama kolom
-    df = df.fillna("-") # Mengganti nilai kosong dengan "-"
+    # Menggunakan os.listdir untuk mencari file yang depannya 'laporan laptop'
+    files = [f for f in os.listdir('.') if f.startswith('laporan laptop')]
+    if not files:
+        st.error("File tidak ditemukan! Pastikan nama filenya benar.")
+        return None
+    
+    # Mengambil file pertama yang ditemukan
+    filename = files[0]
+    df = pd.read_excel(filename, sheet_name='laporan laptop')
+    df.columns = df.columns.str.strip() 
+    df = df.fillna("-") 
     return df
-
-df = load_data()
 
 # Sidebar untuk Filter
 st.sidebar.header("Filter Data")
