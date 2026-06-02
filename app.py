@@ -1,73 +1,47 @@
 import streamlit as st
 import pandas as pd
+import os
 
 # Konfigurasi Page
 st.set_page_config(page_title="Dashboard Inventaris Laptop", layout="wide")
 
-# Judul Dashboard
 st.title("💻 Dashboard Pendataan Laptop Office")
-st.write("Pantau status inventaris laptop kantor secara real-time.")
 
-# Fungsi Load Data
-import os
-
-@st.cache_data
+# Fungsi untuk mencari dan load file otomatis
 def load_data():
-    # Menggunakan os.listdir untuk mencari file yang depannya 'laporan laptop'
-    files = [f for f in os.listdir('.') if f.startswith('laporan laptop')]
+    # Mencari file yang berakhiran .xlsx
+    files = [f for f in os.listdir('.') if f.endswith('.xlsx')]
     if not files:
-        st.error("File tidak ditemukan! Pastikan nama filenya benar.")
+        st.error("File Excel (.xlsx) tidak ditemukan di folder ini! Pastikan file sudah diupload.")
         return None
     
-    # Mengambil file pertama yang ditemukan
-    filename = files[0]
-    df = pd.read_excel(filename, sheet_name='laporan laptop')
-    df.columns = df.columns.str.strip() 
-    df = df.fillna("-") 
+    # Ambil file pertama yang ketemu
+    file_path = files[0]
+    st.write(f"Membaca file: **{file_path}**") # Memastikan file apa yang dibaca
+    
+    df = pd.read_excel(file_path, sheet_name=0) # Membaca sheet pertama
+    df.columns = df.columns.str.strip()
+    df = df.fillna("-")
     return df
 
-# Sidebar untuk Filter
-st.sidebar.header("Filter Data")
-status_filter = st.sidebar.multiselect(
-    "Pilih Status:", 
-    options=df["Status"].unique(), 
-    default=df["Status"].unique()
-)
+df = load_data()
 
-# Filter data berdasarkan pilihan
-df_filtered = df[df["Status"].isin(status_filter)]
+if df is not None:
+    # Sidebar Filter
+    status_filter = st.sidebar.multiselect("Pilih Status:", options=df["Status"].unique(), default=df["Status"].unique())
+    df_filtered = df[df["Status"].isin(status_filter)]
 
-# Tampilan Ringkasan (Metrics)
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Unit", len(df))
-col2.metric("Di Pakai", len(df[df["Status"] == "Di Pakai"]))
-col3.metric("Rusak", len(df[df["Status"] == "Rusak"]))
-col4.metric("Tersedia", len(df[df["Status"] == "Tersedia"]))
+    # Metrics
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Unit", len(df))
+    col2.metric("Di Pakai", len(df[df["Status"] == "Di Pakai"]))
+    col3.metric("Rusak", len(df[df["Status"] == "Rusak"]))
+    col4.metric("Tersedia", len(df[df["Status"] == "Tersedia"]))
 
-# Fungsi untuk Highlight Baris
-def highlight_status(row):
-    color = ''
-    if row['Status'] == 'Rusak':
-        color = 'background-color: #ffcccc' # Merah muda
-    elif row['Status'] == 'Perlu Perbaikan':
-        color = 'background-color: #fff3cc' # Kuning muda
-    return [color] * len(row)
+    # Tabel
+    def highlight_status(row):
+        color = 'background-color: #ffcccc' if row['Status'] == 'Rusak' else ('background-color: #fff3cc' if row['Status'] == 'Perlu Perbaikan' else '')
+        return [color] * len(row)
 
-# Tampilkan Tabel
-st.subheader("Data Inventaris")
-columns_to_show = ["Model", "Serial Number", "Status", "User", "Notes"]
-st.dataframe(
-    df_filtered[columns_to_show].style.apply(highlight_status, axis=1), 
-    use_container_width=True
-)
-
-# Tombol Download
-st.subheader("Ekspor Data")
-csv = df_filtered.to_csv(index=False).encode('utf-8')
-
-st.download_button(
-    label="📥 Download Data Terfilter (CSV)",
-    data=csv,
-    file_name='laporan_laptop_terbaru.csv',
-    mime='text/csv',
-)
+    st.subheader("Data Inventaris")
+    st.dataframe(df_filtered.style.apply(highlight_status, axis=1), use_container_width=True)
