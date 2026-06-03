@@ -1,64 +1,42 @@
 import streamlit as st
 import pandas as pd
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import os
 
-st.set_page_config(page_title="Dashboard Inventaris IT", layout="wide")
-st.title("💻 Dashboard Inventaris Laptop - Umara Group")
+st.set_page_config(layout="wide")
+st.title("💻 Dashboard Inventaris - Umara Group")
 
 FILE_NAME = "laporan laptop terbaru (1).xlsx"
 
+# 1. Load Data
 @st.cache_data
 def load_data():
-    if not os.path.exists(FILE_NAME):
-        return None
-    df = pd.read_excel(FILE_NAME, sheet_name=0)
-    df.columns = df.columns.str.strip()
-    return df.fillna("-")
+    if os.path.exists(FILE_NAME):
+        df = pd.read_excel(FILE_NAME)
+        return df.fillna("-")
+    return pd.DataFrame()
 
 df = load_data()
 
-if df is not None:
-    # --- 1. TABEL DENGAN TOMBOL EDIT/TAMBAH/HAPUS ---
-    st.subheader("Data Inventaris")
-    
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_default_column(editable=True) 
-    gb.configure_selection('multiple', use_checkbox=True) # Aktifkan checkbox untuk hapus
-    gridOptions = gb.build()
+# 2. EDITING (Gunakan st.data_editor yang resmi dari Streamlit)
+st.subheader("Edit Data di Bawah (Klik sel untuk edit):")
+df_edited = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 
-    grid_response = AgGrid(df, gridOptions=gridOptions, update_mode=GridUpdateMode.VALUE_CHANGED, height=300)
-    df_updated = pd.DataFrame(grid_response['data'])
-
-    # Tombol Aksi
-    col_a, col_b, col_c = st.columns(3)
-    
-    if col_a.button("➕ Tambah Baris"):
-        new_row = pd.DataFrame([["-"] * len(df.columns)], columns=df.columns)
-        df = pd.concat([df, new_row], ignore_index=True)
-        df.to_excel(FILE_NAME, index=False)
+# 3. TOMBOL SIMPAN
+if st.button("💾 Simpan Perubahan ke Excel"):
+    try:
+        df_edited.to_excel(FILE_NAME, index=False)
+        st.success("Data berhasil disimpan!")
         st.rerun()
+    except Exception as e:
+        st.error(f"Gagal simpan: {e}. Pastikan file tidak sedang dibuka di Excel!")
 
-    if col_b.button("🗑️ Hapus Baris Terpilih"):
-        selected = grid_response['selected_rows']
-        if selected:
-            indices = [row['_selectedRowNodeInfo']['nodeRowIndex'] for row in selected]
-            df = df.drop(indices).reset_index(drop=True)
-            df.to_excel(FILE_NAME, index=False)
-            st.rerun()
-            
-    if col_c.button("💾 Simpan Perubahan"):
-        df_updated.to_excel(FILE_NAME, index=False)
-        st.success("Data tersimpan!")
-        st.rerun()
-
-    # --- 2. CHART SECTION (DIPINDAHKAN KE BAWAH) ---
-    st.markdown("---")
-    st.subheader("Analisis Data (Chart)")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("Distribusi Status")
-        st.bar_chart(df_updated["Status"].value_counts())
-    with col2:
-        st.write("Model Laptop Terbanyak")
-        st.bar_chart(df_updated["Model"].value_counts().head(10))
+# 4. CHART (Otomatis update berdasarkan hasil edit)
+st.markdown("---")
+st.subheader("Analisis Data")
+col1, col2 = st.columns(2)
+with col1:
+    st.write("Distribusi Status")
+    st.bar_chart(df_edited["Status"].value_counts())
+with col2:
+    st.write("Model Laptop Terbanyak")
+    st.bar_chart(df_edited["Model"].value_counts().head(5))
