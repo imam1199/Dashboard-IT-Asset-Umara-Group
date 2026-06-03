@@ -8,16 +8,19 @@ st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 
 FILE_NAME = "laporan laptop terbaru (1).xlsx"
 
-# 1. Load Data dengan TTL (Time To Live) agar cache bisa diperbarui
+# 1. Load Data
 @st.cache_data(ttl=60)
 def load_data():
     if os.path.exists(FILE_NAME):
-        df = pd.read_excel(FILE_NAME)
-        # Bersihkan nama kolom dari spasi berlebih
-        df.columns = df.columns.str.strip()
-        if 'No Aset' in df.columns:
-            df['No Aset'] = df['No Aset'].astype(str).replace(['nan', 'None', ''], '-')
-        return df.fillna("-")
+        try:
+            df = pd.read_excel(FILE_NAME)
+            df.columns = df.columns.str.strip()
+            if 'No Aset' in df.columns:
+                df['No Aset'] = df['No Aset'].astype(str).replace(['nan', 'None', ''], '-')
+            return df.fillna("-")
+        except Exception as e:
+            st.error(f"Error memuat file: {e}")
+            return pd.DataFrame()
     return pd.DataFrame()
 
 # Inisialisasi Session State
@@ -41,7 +44,6 @@ def generate_asset_id(df):
 # 2. SIDEBAR - Kontrol Dashboard
 st.sidebar.title("Kontrol Dashboard")
 
-# Filter Status
 unique_status = ["Semua"] + list(st.session_state.df["Status"].unique())
 status_filter = st.sidebar.selectbox("Filter Status:", unique_status, key="status_key")
 
@@ -62,14 +64,17 @@ if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
         st.session_state.df = st.session_state.df.iloc[:-1]
         st.rerun()
 
-# Tombol Simpan dengan pembersihan cache
 if st.sidebar.button("💾 Simpan Data"):
-    st.session_state.df.to_excel(FILE_NAME, index=False)
-    st.cache_data.clear()
-    st.success("Data berhasil disimpan!")
-    st.rerun()
+    try:
+        # Menggunakan engine openpyxl untuk hasil export excel yang rapi
+        st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
+        st.cache_data.clear()
+        st.success("Data berhasil disimpan!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Gagal menyimpan data: {e}")
 
-# 3. FILTER LOGIC & SEARCH
+# 3. FILTER LOGIC
 filtered_df = st.session_state.df.copy()
 
 if status_filter != "Semua":
@@ -93,7 +98,6 @@ col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu P
 st.markdown("---")
 
 st.subheader("Data Inventaris")
-# Data Editor dengan key unik untuk sinkronisasi
 df_edited = st.data_editor(
     filtered_df, 
     use_container_width=True, 
@@ -110,10 +114,8 @@ df_edited = st.data_editor(
     }
 )
 
-# Sinkronisasi hasil edit ke df utama (menggunakan update agar baris baru tersimpan)
 if not df_edited.equals(filtered_df):
     st.session_state.df.update(df_edited)
-    # Jika ada penambahan baris (jumlah baris berubah), append ke df
     if len(df_edited) > len(filtered_df):
         st.session_state.df = df_edited
 
@@ -135,9 +137,10 @@ with col_c1:
 
 with col_c2:
     st.write("**Top 5 Model Laptop Terbanyak**")
-    # Penanganan error agar tidak KeyError jika kolom 'Model' hilang/kosong
     if 'Model' in filtered_df.columns:
-        top_models = filtered_df[filtered_df['Model'] != "-"]['Model'].value_counts().head(5).reset_index()
+        # Filter agar tidak menghitung baris kosong "-"
+        df_plot = filtered_df[filtered_df['Model'] != "-"]
+        top_models = df_plot['Model'].value_counts().head(5).reset_index()
         top_models.columns = ['Model', 'Jumlah']
         fig2 = px.bar(top_models, x='Jumlah', y='Model', orientation='h', color='Jumlah', color_continuous_scale='Blues')
         fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
