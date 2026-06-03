@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import plotly.express as px
 
+# Konfigurasi Halaman
 st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 
 FILE_NAME = "laporan laptop terbaru (1).xlsx"
@@ -19,6 +20,7 @@ def load_data():
         return df.fillna("-")
     return pd.DataFrame()
 
+# Inisialisasi Session State
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
@@ -36,7 +38,7 @@ def generate_asset_id(df):
                 df.at[index, 'No Aset'] = f"{bu_map[bu]}-{tahun}-{count:03d}"
     return df
 
-# 2. SIDEBAR - FILTER & TOMBOL KONTROL
+# 2. SIDEBAR - Kontrol Dashboard
 st.sidebar.title("Kontrol Dashboard")
 
 # Filter Status
@@ -65,7 +67,7 @@ if st.sidebar.button("💾 Simpan Data"):
     st.success("Data berhasil disimpan!")
 
 # 3. FILTER LOGIC & SEARCH
-filtered_df = st.session_state.df
+filtered_df = st.session_state.df.copy()
 
 # Filter Status
 if status_filter != "Semua":
@@ -109,6 +111,7 @@ df_edited = st.data_editor(
 
 # Sinkronisasi hasil edit ke df utama
 if not df_edited.equals(filtered_df):
+    # Update baris yang berubah di df utama
     st.session_state.df.update(df_edited)
 
 # 5. CHART BERDAMPINGAN
