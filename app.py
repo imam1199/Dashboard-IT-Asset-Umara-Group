@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import plotly.express as px
+import io
 
 # Konfigurasi Halaman
 st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
@@ -64,9 +65,9 @@ if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
         st.session_state.df = st.session_state.df.iloc[:-1]
         st.rerun()
 
+# Tombol Simpan
 if st.sidebar.button("💾 Simpan Data"):
     try:
-        # Menggunakan engine openpyxl untuk hasil export excel yang rapi
         st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
         st.cache_data.clear()
         st.success("Data berhasil disimpan!")
@@ -74,9 +75,22 @@ if st.sidebar.button("💾 Simpan Data"):
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
+# Tombol Download Rapi (Agar tidak berantakan)
+st.sidebar.markdown("---")
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    st.session_state.df.to_excel(writer, index=False)
+buffer.seek(0)
+
+st.sidebar.download_button(
+    label="📥 Download Laporan (Excel)",
+    data=buffer,
+    file_name="Laporan_IT_Asset_Umara.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
 # 3. FILTER LOGIC
 filtered_df = st.session_state.df.copy()
-
 if status_filter != "Semua":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
@@ -138,7 +152,6 @@ with col_c1:
 with col_c2:
     st.write("**Top 5 Model Laptop Terbanyak**")
     if 'Model' in filtered_df.columns:
-        # Filter agar tidak menghitung baris kosong "-"
         df_plot = filtered_df[filtered_df['Model'] != "-"]
         top_models = df_plot['Model'].value_counts().head(5).reset_index()
         top_models.columns = ['Model', 'Jumlah']
