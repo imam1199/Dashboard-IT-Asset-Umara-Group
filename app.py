@@ -82,12 +82,13 @@ if search_query:
 # 4. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
 
-# Metrik
-col1, col2, col3, col4 = st.columns(4)
+# Metrik (Ditambah kolom ke-5 untuk Perlu Perbaikan)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Total Unit", len(filtered_df))
 col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
 col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
 col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
+col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
 
 st.markdown("---")
 
@@ -101,7 +102,7 @@ df_edited = st.data_editor(
         "Status": st.column_config.SelectboxColumn(
             "Status",
             help="Pilih status laptop",
-            options=["Tersedia", "Di Pakai", "Rusak"],
+            options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"], # Opsi ditambah
             required=True,
         ),
         "Notes": st.column_config.TextColumn("Notes", width="large"),
@@ -111,7 +112,6 @@ df_edited = st.data_editor(
 
 # Sinkronisasi hasil edit ke df utama
 if not df_edited.equals(filtered_df):
-    # Update baris yang berubah di df utama
     st.session_state.df.update(df_edited)
 
 # 5. CHART BERDAMPINGAN
@@ -121,7 +121,13 @@ col_c1, col_c2 = st.columns(2)
 
 with col_c1:
     st.write("**Distribusi Status Laptop**")
-    fig1 = px.pie(filtered_df, names='Status', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+    # Warna disesuaikan agar status baru terlihat
+    fig1 = px.pie(filtered_df, names='Status', hole=0.4, 
+                  color='Status',
+                  color_discrete_map={'Tersedia': '#00CC96', 
+                                      'Di Pakai': '#636EFA', 
+                                      'Rusak': '#EF553B', 
+                                      'Perlu Perbaikan': '#FFA500'}) 
     fig1.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
     st.plotly_chart(fig1, use_container_width=True)
 
