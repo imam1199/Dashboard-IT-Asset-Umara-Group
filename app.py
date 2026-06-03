@@ -39,7 +39,7 @@ def generate_asset_id(df):
 # 2. SIDEBAR - FILTER & TOMBOL KONTROL
 st.sidebar.title("Kontrol Dashboard")
 
-# Filter
+# Filter Status
 unique_status = ["Semua"] + list(st.session_state.df["Status"].unique())
 status_filter = st.sidebar.selectbox("Filter Status:", unique_status, key="status_key")
 
@@ -89,13 +89,19 @@ col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
 
 st.markdown("---")
 
-# Tabel Edit
+# Tabel Edit dengan Dropdown Status
 st.subheader("Data Inventaris")
 df_edited = st.data_editor(
     filtered_df, 
     use_container_width=True, 
     num_rows="dynamic",
     column_config={
+        "Status": st.column_config.SelectboxColumn(
+            "Status",
+            help="Pilih status laptop",
+            options=["Tersedia", "Di Pakai", "Rusak"],
+            required=True,
+        ),
         "Notes": st.column_config.TextColumn("Notes", width="large"),
         "No Aset": st.column_config.TextColumn("No Aset", width="small")
     }
