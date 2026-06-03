@@ -46,7 +46,6 @@ status_filter = st.sidebar.selectbox("Filter Status:", unique_status, key="statu
 st.sidebar.markdown("---")
 st.sidebar.subheader("Menu Edit & Aset")
 
-# TOMBOL KONTROL DI SINI
 if st.sidebar.button("➕ Tambah Baris"):
     new_row = pd.DataFrame([["-"] * len(st.session_state.df.columns)], columns=st.session_state.df.columns)
     st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
@@ -83,11 +82,19 @@ col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
 
 st.markdown("---")
 
-# Tabel Edit
+# Tabel Edit dengan Konfigurasi Lebar Kolom
 st.subheader("Data Inventaris")
-df_edited = st.data_editor(filtered_df, use_container_width=True, num_rows="dynamic")
+df_edited = st.data_editor(
+    filtered_df, 
+    use_container_width=True, 
+    num_rows="dynamic",
+    column_config={
+        "Notes": st.column_config.TextColumn("Notes", width="large"),
+        "No Aset": st.column_config.TextColumn("No Aset", width="small")
+    }
+)
 
-# Sinkronisasi edit
+# Sinkronisasi edit ke df utama
 if not df_edited.equals(filtered_df):
     st.session_state.df.update(df_edited)
 
