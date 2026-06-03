@@ -64,11 +64,18 @@ if st.sidebar.button("💾 Simpan Data"):
     st.session_state.df.to_excel(FILE_NAME, index=False)
     st.success("Data berhasil disimpan!")
 
-# 3. FILTER LOGIC
-if status_filter == "Semua":
-    filtered_df = st.session_state.df
-else:
-    filtered_df = st.session_state.df[st.session_state.df["Status"] == status_filter]
+# 3. FILTER LOGIC & SEARCH
+filtered_df = st.session_state.df
+
+# Filter Status
+if status_filter != "Semua":
+    filtered_df = filtered_df[filtered_df["Status"] == status_filter]
+
+# Search Bar
+search_query = st.text_input("🔍 Cari Laptop...", placeholder="Ketik Model, Serial, User, dll...")
+if search_query:
+    mask = filtered_df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
+    filtered_df = filtered_df[mask]
 
 # 4. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
@@ -82,7 +89,7 @@ col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
 
 st.markdown("---")
 
-# Tabel Edit dengan Konfigurasi Lebar Kolom
+# Tabel Edit
 st.subheader("Data Inventaris")
 df_edited = st.data_editor(
     filtered_df, 
@@ -94,7 +101,7 @@ df_edited = st.data_editor(
     }
 )
 
-# Sinkronisasi edit ke df utama
+# Sinkronisasi hasil edit ke df utama
 if not df_edited.equals(filtered_df):
     st.session_state.df.update(df_edited)
 
