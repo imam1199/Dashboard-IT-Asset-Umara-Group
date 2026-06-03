@@ -24,7 +24,6 @@ def load_data():
             return pd.DataFrame()
     return pd.DataFrame()
 
-# Inisialisasi Session State
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
@@ -42,9 +41,8 @@ def generate_asset_id(df):
                 df.at[index, 'No Aset'] = f"{bu_map[bu]}-{tahun}-{count:03d}"
     return df
 
-# 2. SIDEBAR - Kontrol Dashboard
+# 2. SIDEBAR
 st.sidebar.title("Kontrol Dashboard")
-
 unique_status = ["Semua"] + list(st.session_state.df["Status"].unique())
 status_filter = st.sidebar.selectbox("Filter Status:", unique_status, key="status_key")
 
@@ -65,66 +63,57 @@ if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
         st.session_state.df = st.session_state.df.iloc[:-1]
         st.rerun()
 
-# Tombol Simpan
 if st.sidebar.button("💾 Simpan Data"):
     try:
         st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
         st.cache_data.clear()
-        st.success("Data berhasil disimpan!")
+        st.success("Data disimpan!")
         st.rerun()
     except Exception as e:
-        st.error(f"Gagal menyimpan data: {e}")
-
-# Tombol Download Rapi (Agar tidak berantakan)
-st.sidebar.markdown("---")
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-    st.session_state.df.to_excel(writer, index=False)
-buffer.seek(0)
-
-st.sidebar.download_button(
-    label="📥 Download Laporan (Excel)",
-    data=buffer,
-    file_name="Laporan_IT_Asset_Umara.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+        st.error(f"Gagal simpan: {e}")
 
 # 3. FILTER LOGIC
 filtered_df = st.session_state.df.copy()
 if status_filter != "Semua":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
+# 4. MAIN DASHBOARD
+st.title("📊 Dashboard IT Asset Umara Group")
+
+# Metrik & Tombol Download
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("Total", len(filtered_df))
+col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
+col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
+col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
+col5.metric("Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
+
+st.markdown("---")
+
+# Tombol Download (Diletakkan di main area agar terlihat)
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    filtered_df.to_excel(writer, index=False)
+buffer.seek(0)
+
+st.download_button(
+    label="📥 Download Data yang Terfilter (Excel)",
+    data=buffer,
+    file_name="Laporan_IT_Asset_Export.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
 search_query = st.text_input("🔍 Cari Laptop...", placeholder="Ketik Model, Serial, User, dll...")
 if search_query:
     mask = filtered_df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
     filtered_df = filtered_df[mask]
 
-# 4. MAIN DASHBOARD
-st.title("📊 Dashboard IT Asset Umara Group")
-
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Total Unit", len(filtered_df))
-col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
-col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
-col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
-col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
-
-st.markdown("---")
-
+# Tabel
 st.subheader("Data Inventaris")
 df_edited = st.data_editor(
-    filtered_df, 
-    use_container_width=True, 
-    num_rows="dynamic",
-    key="inventory_editor",
+    filtered_df, use_container_width=True, num_rows="dynamic", key="inventory_editor",
     column_config={
-        "Status": st.column_config.SelectboxColumn(
-            "Status",
-            options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"],
-            required=True,
-        ),
-        "Notes": st.column_config.TextColumn("Notes", width="large"),
-        "No Aset": st.column_config.TextColumn("No Aset", width="small")
+        "Status": st.column_config.SelectboxColumn("Status", options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"], required=True),
     }
 )
 
@@ -133,30 +122,10 @@ if not df_edited.equals(filtered_df):
     if len(df_edited) > len(filtered_df):
         st.session_state.df = df_edited
 
-# 5. CHART BERDAMPINGAN
+# Chart
 st.markdown("---")
-st.subheader("📊 Analisis Data Visual")
 col_c1, col_c2 = st.columns(2)
-
 with col_c1:
-    st.write("**Distribusi Status Laptop**")
-    fig1 = px.pie(filtered_df, names='Status', hole=0.4, 
-                  color='Status',
-                  color_discrete_map={'Tersedia': '#00CC96', 
-                                      'Di Pakai': '#636EFA', 
-                                      'Rusak': '#EF553B', 
-                                      'Perlu Perbaikan': '#FFA500'}) 
-    fig1.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
+    fig1 = px.pie(filtered_df, names='Status', hole=0.4, color='Status',
+                  color_discrete_map={'Tersedia': '#00CC96', 'Di Pakai': '#636EFA', 'Rusak': '#EF553B', 'Perlu Perbaikan': '#FFA500'})
     st.plotly_chart(fig1, use_container_width=True)
-
-with col_c2:
-    st.write("**Top 5 Model Laptop Terbanyak**")
-    if 'Model' in filtered_df.columns:
-        df_plot = filtered_df[filtered_df['Model'] != "-"]
-        top_models = df_plot['Model'].value_counts().head(5).reset_index()
-        top_models.columns = ['Model', 'Jumlah']
-        fig2 = px.bar(top_models, x='Jumlah', y='Model', orientation='h', color='Jumlah', color_continuous_scale='Blues')
-        fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.warning("Kolom 'Model' tidak ditemukan.")
