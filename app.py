@@ -4,12 +4,10 @@ import os
 import plotly.express as px
 import io
 
-# Konfigurasi Halaman
 st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
-
 FILE_NAME = "laporan laptop terbaru (1).xlsx"
 
-# Fungsi Load Data
+# 1. Load Data
 @st.cache_data(ttl=60)
 def load_data():
     if os.path.exists(FILE_NAME):
@@ -19,22 +17,18 @@ def load_data():
             if 'No Aset' in df.columns:
                 df['No Aset'] = df['No Aset'].astype(str).replace(['nan', 'None', ''], '-')
             return df.fillna("-")
-        except:
-            return pd.DataFrame()
+        except: return pd.DataFrame()
     return pd.DataFrame()
 
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
-# Fungsi Auto-Save (Menyimpan otomatis)
 def auto_save():
     st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
     st.cache_data.clear()
 
-# Fungsi Generate Nomor Aset
 def generate_asset_id(df):
     bu_map = {"UCR": "UCR", "UNB": "UNB", "LBI": "LBI", "RNB": "RNB", "UMK": "UMK"}
-    tahun = "26"
     for index, row in df.iterrows():
         val = str(row.get('No Aset', '-')).strip()
         if val in ["-", "nan", "None"]:
@@ -42,7 +36,7 @@ def generate_asset_id(df):
             if bu in bu_map:
                 existing = df[(df['Bu Owner'] == bu) & (df['No Aset'].astype(str).str.contains(bu, na=False))]
                 count = len(existing) + 1
-                df.at[index, 'No Aset'] = f"{bu_map[bu]}-{tahun}-{count:03d}"
+                df.at[index, 'No Aset'] = f"{bu_map[bu]}-26-{count:03d}"
     return df
 
 # 2. SIDEBAR
@@ -61,18 +55,40 @@ if st.sidebar.button("🔢 Generate Nomor Aset"):
     auto_save()
     st.rerun()
 
-# 4. MAIN DASHBOARD
+if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
+    if not st.session_state.df.empty:
+        st.session_state.df = st.session_state.df.iloc[:-1]
+        auto_save()
+        st.rerun()
+
+# 3. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
 
+# Filter & Search
 filtered_df = st.session_state.df.copy()
 if status_filter != "Semua":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
-# Tabel Data Editor (Auto-Save Aktif di Sini)
+search_query = st.text_input("🔍 Cari Laptop...", placeholder="Ketik Model, Serial, User, dll...")
+if search_query:
+    mask = filtered_df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
+    filtered_df = filtered_df[mask]
+
+# Metrik
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("Total", len(filtered_df))
+col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
+col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
+col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
+col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
+
+st.markdown("---")
+
+# Data Editor (Auto-Save)
 st.subheader("Data Inventaris")
 df_edited = st.data_editor(
     filtered_df, use_container_width=True, num_rows="dynamic", key="inventory_editor",
-    on_change=auto_save, # <--- DATA OTOMATIS TERSIMPAN SAAT EDIT
+    on_change=auto_save,
     column_config={"Status": st.column_config.SelectboxColumn("Status", options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"], required=True)}
 )
 
@@ -81,9 +97,16 @@ if not df_edited.equals(filtered_df):
     if len(df_edited) > len(filtered_df):
         st.session_state.df = df_edited
 
-# Tombol Download (Pasti muncul di bawah tabel)
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-    st.session_state.df.to_excel(writer, index=False)
-buffer.seek(0)
-st.download_button("📥 Download Laporan Lengkap (Excel)", buffer, "Laporan_IT_Asset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+# Chart & Download
+st.markdown("---")
+c1, c2 = st.columns([1, 1])
+with c1:
+    st.write("**Distribusi Status**")
+    fig = px.pie(filtered_df, names='Status', hole=0.4)
+    st.plotly_chart(fig, use_container_width=True)
+
+with c2:
+    st.write("📥 Ekspor Data")
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as w: filtered_df.to_excel(w, index=False)
+    st.download_button("Download Laporan Excel", buffer.getvalue(), "Laporan_Aset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
