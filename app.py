@@ -9,7 +9,7 @@ st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 
 FILE_NAME = "laporan laptop terbaru (1).xlsx"
 
-# 1. Load Data
+# Fungsi Load Data
 @st.cache_data(ttl=60)
 def load_data():
     if os.path.exists(FILE_NAME):
@@ -19,15 +19,14 @@ def load_data():
             if 'No Aset' in df.columns:
                 df['No Aset'] = df['No Aset'].astype(str).replace(['nan', 'None', ''], '-')
             return df.fillna("-")
-        except Exception as e:
-            st.error(f"Error memuat file: {e}")
+        except:
             return pd.DataFrame()
     return pd.DataFrame()
 
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
-# Fungsi Auto-Save untuk Data Editor
+# Fungsi Auto-Save (Menyimpan otomatis)
 def auto_save():
     st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
     st.cache_data.clear()
@@ -35,7 +34,7 @@ def auto_save():
 # Fungsi Generate Nomor Aset
 def generate_asset_id(df):
     bu_map = {"UCR": "UCR", "UNB": "UNB", "LBI": "LBI", "RNB": "RNB", "UMK": "UMK"}
-    tahun = "26" 
+    tahun = "26"
     for index, row in df.iterrows():
         val = str(row.get('No Aset', '-')).strip()
         if val in ["-", "nan", "None"]:
@@ -48,12 +47,9 @@ def generate_asset_id(df):
 
 # 2. SIDEBAR
 st.sidebar.title("Kontrol Dashboard")
-unique_status = ["Semua"] + list(st.session_state.df["Status"].unique())
-status_filter = st.sidebar.selectbox("Filter Status:", unique_status, key="status_key")
+status_filter = st.sidebar.selectbox("Filter Status:", ["Semua"] + list(st.session_state.df["Status"].unique()))
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("Menu Edit & Aset")
-
+st.sidebar.subheader("Menu Aset")
 if st.sidebar.button("➕ Tambah Baris"):
     new_row = pd.DataFrame([["-"] * len(st.session_state.df.columns)], columns=st.session_state.df.columns)
     st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
@@ -65,57 +61,19 @@ if st.sidebar.button("🔢 Generate Nomor Aset"):
     auto_save()
     st.rerun()
 
-if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
-    if not st.session_state.df.empty:
-        st.session_state.df = st.session_state.df.iloc[:-1]
-        auto_save()
-        st.rerun()
-
-# 3. MAIN DASHBOARD
+# 4. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
 
-# Filter Logic
 filtered_df = st.session_state.df.copy()
 if status_filter != "Semua":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
-# Metrik & Tombol Download
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Total", len(filtered_df))
-col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
-col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
-col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
-col5.metric("Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
-
-st.markdown("---")
-
-# Tombol Download
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-    filtered_df.to_excel(writer, index=False)
-buffer.seek(0)
-
-st.download_button(
-    label="📥 Download Laporan (Excel)",
-    data=buffer,
-    file_name="Laporan_IT_Asset_Umara.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-
-# Search
-search_query = st.text_input("🔍 Cari Laptop...", placeholder="Ketik Model, Serial, User, dll...")
-if search_query:
-    mask = filtered_df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
-    filtered_df = filtered_df[mask]
-
-# Data Editor dengan Auto-Save
+# Tabel Data Editor (Auto-Save Aktif di Sini)
 st.subheader("Data Inventaris")
 df_edited = st.data_editor(
     filtered_df, use_container_width=True, num_rows="dynamic", key="inventory_editor",
-    on_change=auto_save, # Otomatis simpan setiap ada perubahan
-    column_config={
-        "Status": st.column_config.SelectboxColumn("Status", options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"], required=True),
-    }
+    on_change=auto_save, # <--- DATA OTOMATIS TERSIMPAN SAAT EDIT
+    column_config={"Status": st.column_config.SelectboxColumn("Status", options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"], required=True)}
 )
 
 if not df_edited.equals(filtered_df):
@@ -123,10 +81,9 @@ if not df_edited.equals(filtered_df):
     if len(df_edited) > len(filtered_df):
         st.session_state.df = df_edited
 
-# Chart
-st.markdown("---")
-col_c1, col_c2 = st.columns(2)
-with col_c1:
-    fig1 = px.pie(filtered_df, names='Status', hole=0.4, color='Status',
-                  color_discrete_map={'Tersedia': '#00CC96', 'Di Pakai': '#636EFA', 'Rusak': '#EF553B', 'Perlu Perbaikan': '#FFA500'})
-    st.plotly_chart(fig1, use_container_width=True)
+# Tombol Download (Pasti muncul di bawah tabel)
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    st.session_state.df.to_excel(writer, index=False)
+buffer.seek(0)
+st.download_button("📥 Download Laporan Lengkap (Excel)", buffer, "Laporan_IT_Asset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
