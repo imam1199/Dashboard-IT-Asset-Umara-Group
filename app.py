@@ -27,6 +27,11 @@ def load_data():
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
+# Fungsi Auto-Save untuk Data Editor
+def auto_save():
+    st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
+    st.cache_data.clear()
+
 # Fungsi Generate Nomor Aset
 def generate_asset_id(df):
     bu_map = {"UCR": "UCR", "UNB": "UNB", "LBI": "LBI", "RNB": "RNB", "UMK": "UMK"}
@@ -52,33 +57,27 @@ st.sidebar.subheader("Menu Edit & Aset")
 if st.sidebar.button("➕ Tambah Baris"):
     new_row = pd.DataFrame([["-"] * len(st.session_state.df.columns)], columns=st.session_state.df.columns)
     st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
+    auto_save()
     st.rerun()
 
 if st.sidebar.button("🔢 Generate Nomor Aset"):
     st.session_state.df = generate_asset_id(st.session_state.df)
+    auto_save()
     st.rerun()
 
 if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
     if not st.session_state.df.empty:
         st.session_state.df = st.session_state.df.iloc[:-1]
+        auto_save()
         st.rerun()
 
-if st.sidebar.button("💾 Simpan Data"):
-    try:
-        st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
-        st.cache_data.clear()
-        st.success("Data disimpan!")
-        st.rerun()
-    except Exception as e:
-        st.error(f"Gagal simpan: {e}")
+# 3. MAIN DASHBOARD
+st.title("📊 Dashboard IT Asset Umara Group")
 
-# 3. FILTER LOGIC
+# Filter Logic
 filtered_df = st.session_state.df.copy()
 if status_filter != "Semua":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
-
-# 4. MAIN DASHBOARD
-st.title("📊 Dashboard IT Asset Umara Group")
 
 # Metrik & Tombol Download
 col1, col2, col3, col4, col5 = st.columns(5)
@@ -90,28 +89,30 @@ col5.metric("Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaik
 
 st.markdown("---")
 
-# Tombol Download (Diletakkan di main area agar terlihat)
+# Tombol Download
 buffer = io.BytesIO()
 with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
     filtered_df.to_excel(writer, index=False)
 buffer.seek(0)
 
 st.download_button(
-    label="📥 Download Data yang Terfilter (Excel)",
+    label="📥 Download Laporan (Excel)",
     data=buffer,
-    file_name="Laporan_IT_Asset_Export.xlsx",
+    file_name="Laporan_IT_Asset_Umara.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
+# Search
 search_query = st.text_input("🔍 Cari Laptop...", placeholder="Ketik Model, Serial, User, dll...")
 if search_query:
     mask = filtered_df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
     filtered_df = filtered_df[mask]
 
-# Tabel
+# Data Editor dengan Auto-Save
 st.subheader("Data Inventaris")
 df_edited = st.data_editor(
     filtered_df, use_container_width=True, num_rows="dynamic", key="inventory_editor",
+    on_change=auto_save, # Otomatis simpan setiap ada perubahan
     column_config={
         "Status": st.column_config.SelectboxColumn("Status", options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"], required=True),
     }
