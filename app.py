@@ -7,22 +7,26 @@ import io
 st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 FILE_NAME = "laporan laptop terbaru (1).xlsx"
 
-# 1. Load Data
-@st.cache_data(ttl=60)
+# 1. Load Data (Diberi ttl=0 agar selalu cek file fisik jika tombol refresh diklik)
+@st.cache_data(ttl=0)
 def load_data():
     if os.path.exists(FILE_NAME):
         try:
-            df = pd.read_excel(FILE_NAME)
+            df = pd.read_excel(FILE_NAME, engine='openpyxl')
             df.columns = df.columns.str.strip()
             if 'No Aset' in df.columns:
                 df['No Aset'] = df['No Aset'].astype(str).replace(['nan', 'None', ''], '-')
             return df.fillna("-")
-        except: return pd.DataFrame()
+        except Exception as e:
+            st.error(f"Error memuat file: {e}")
+            return pd.DataFrame()
     return pd.DataFrame()
 
+# Inisialisasi Session State
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
+# Fungsi Auto-Save
 def auto_save():
     st.session_state.df.to_excel(FILE_NAME, index=False, engine='openpyxl')
     st.cache_data.clear()
@@ -41,6 +45,13 @@ def generate_asset_id(df):
 
 # 2. SIDEBAR
 st.sidebar.title("Kontrol Dashboard")
+
+# Tombol Refresh Data dari Excel
+if st.sidebar.button("🔄 Refresh Data dari Excel"):
+    st.cache_data.clear()
+    st.session_state.df = load_data()
+    st.rerun()
+
 status_filter = st.sidebar.selectbox("Filter Status:", ["Semua"] + list(st.session_state.df["Status"].unique()))
 
 st.sidebar.subheader("Menu Aset")
@@ -61,7 +72,7 @@ if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
         auto_save()
         st.rerun()
 
-# Tombol Simpan Manual (Sesuai permintaan Anda)
+# Tombol Simpan Manual
 if st.sidebar.button("💾 Simpan Data"):
     auto_save()
     st.success("Data berhasil disimpan!")
@@ -69,11 +80,11 @@ if st.sidebar.button("💾 Simpan Data"):
 # 3. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
 
-# Filter & Search
 filtered_df = st.session_state.df.copy()
 if status_filter != "Semua":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
+# Search Bar
 search_query = st.text_input("🔍 Cari Laptop...", placeholder="Ketik Model, Serial, User, dll...")
 if search_query:
     mask = filtered_df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
@@ -85,7 +96,7 @@ col1.metric("Total", len(filtered_df))
 col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
 col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
 col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
-col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
+col5.metric("Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
 
 st.markdown("---")
 
@@ -102,7 +113,7 @@ if not df_edited.equals(filtered_df):
     if len(df_edited) > len(filtered_df):
         st.session_state.df = df_edited
 
-# 4. CHART & DOWNLOAD
+# 4. CHART BERDAMPINGAN
 st.markdown("---")
 st.subheader("📊 Analisis Data Visual")
 c1, c2 = st.columns(2)
