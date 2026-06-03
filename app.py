@@ -8,8 +8,8 @@ st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 
 FILE_NAME = "laporan laptop terbaru (1).xlsx"
 
-# 1. Load Data
-@st.cache_data
+# 1. Load Data dengan TTL (Time To Live) agar cache bisa diperbarui
+@st.cache_data(ttl=60)
 def load_data():
     if os.path.exists(FILE_NAME):
         df = pd.read_excel(FILE_NAME)
@@ -62,18 +62,19 @@ if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
         st.session_state.df = st.session_state.df.iloc[:-1]
         st.rerun()
 
+# Tombol Simpan dengan pembersihan cache
 if st.sidebar.button("💾 Simpan Data"):
     st.session_state.df.to_excel(FILE_NAME, index=False)
+    st.cache_data.clear()
     st.success("Data berhasil disimpan!")
+    st.rerun()
 
 # 3. FILTER LOGIC & SEARCH
 filtered_df = st.session_state.df.copy()
 
-# Filter Status
 if status_filter != "Semua":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
-# Search Bar
 search_query = st.text_input("🔍 Cari Laptop...", placeholder="Ketik Model, Serial, User, dll...")
 if search_query:
     mask = filtered_df.apply(lambda row: row.astype(str).str.contains(search_query, case=False).any(), axis=1)
@@ -82,7 +83,6 @@ if search_query:
 # 4. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
 
-# Metrik (Ditambah kolom ke-5 untuk Perlu Perbaikan)
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Total Unit", len(filtered_df))
 col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
@@ -92,17 +92,17 @@ col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu P
 
 st.markdown("---")
 
-# Tabel Edit dengan Dropdown Status
 st.subheader("Data Inventaris")
+# Data Editor dengan key unik untuk sinkronisasi
 df_edited = st.data_editor(
     filtered_df, 
     use_container_width=True, 
     num_rows="dynamic",
+    key="inventory_editor",
     column_config={
         "Status": st.column_config.SelectboxColumn(
             "Status",
-            help="Pilih status laptop",
-            options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"], # Opsi ditambah
+            options=["Tersedia", "Di Pakai", "Rusak", "Perlu Perbaikan"],
             required=True,
         ),
         "Notes": st.column_config.TextColumn("Notes", width="large"),
@@ -110,9 +110,12 @@ df_edited = st.data_editor(
     }
 )
 
-# Sinkronisasi hasil edit ke df utama
+# Sinkronisasi hasil edit ke df utama (menggunakan update agar baris baru tersimpan)
 if not df_edited.equals(filtered_df):
     st.session_state.df.update(df_edited)
+    # Jika ada penambahan baris (jumlah baris berubah), append ke df
+    if len(df_edited) > len(filtered_df):
+        st.session_state.df = df_edited
 
 # 5. CHART BERDAMPINGAN
 st.markdown("---")
@@ -121,7 +124,6 @@ col_c1, col_c2 = st.columns(2)
 
 with col_c1:
     st.write("**Distribusi Status Laptop**")
-    # Warna disesuaikan agar status baru terlihat
     fig1 = px.pie(filtered_df, names='Status', hole=0.4, 
                   color='Status',
                   color_discrete_map={'Tersedia': '#00CC96', 
@@ -133,9 +135,12 @@ with col_c1:
 
 with col_c2:
     st.write("**Top 5 Model Laptop Terbanyak**")
+    # Penanganan error agar tidak KeyError jika kolom 'Model' hilang/kosong
     if 'Model' in filtered_df.columns:
-        top_models = filtered_df['Model'].value_counts().head(5).reset_index()
+        top_models = filtered_df[filtered_df['Model'] != "-"]['Model'].value_counts().head(5).reset_index()
         top_models.columns = ['Model', 'Jumlah']
         fig2 = px.bar(top_models, x='Jumlah', y='Model', orientation='h', color='Jumlah', color_continuous_scale='Blues')
         fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
         st.plotly_chart(fig2, use_container_width=True)
+    else:
+        st.warning("Kolom 'Model' tidak ditemukan.")
