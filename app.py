@@ -61,6 +61,11 @@ if st.sidebar.button("🗑️ Hapus Baris Terakhir"):
         auto_save()
         st.rerun()
 
+# Tombol Simpan Manual (Sesuai permintaan Anda)
+if st.sidebar.button("💾 Simpan Data"):
+    auto_save()
+    st.success("Data berhasil disimpan!")
+
 # 3. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
 
@@ -80,7 +85,7 @@ col1.metric("Total", len(filtered_df))
 col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
 col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
 col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
-col5.metric("Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
+col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
 
 st.markdown("---")
 
