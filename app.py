@@ -80,11 +80,11 @@ col1.metric("Total", len(filtered_df))
 col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
 col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
 col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
-col5.metric("Perlu Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
+col5.metric("Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
 
 st.markdown("---")
 
-# Data Editor (Auto-Save)
+# Data Editor
 st.subheader("Data Inventaris")
 df_edited = st.data_editor(
     filtered_df, use_container_width=True, num_rows="dynamic", key="inventory_editor",
@@ -97,16 +97,27 @@ if not df_edited.equals(filtered_df):
     if len(df_edited) > len(filtered_df):
         st.session_state.df = df_edited
 
-# Chart & Download
+# 4. CHART & DOWNLOAD
 st.markdown("---")
-c1, c2 = st.columns([1, 1])
+st.subheader("📊 Analisis Data Visual")
+c1, c2 = st.columns(2)
+
 with c1:
-    st.write("**Distribusi Status**")
-    fig = px.pie(filtered_df, names='Status', hole=0.4)
-    st.plotly_chart(fig, use_container_width=True)
+    st.write("**Distribusi Status Laptop**")
+    fig1 = px.pie(filtered_df, names='Status', hole=0.4, color='Status',
+                  color_discrete_map={'Tersedia': '#00CC96', 'Di Pakai': '#636EFA', 'Rusak': '#EF553B', 'Perlu Perbaikan': '#FFA500'})
+    st.plotly_chart(fig1, use_container_width=True)
 
 with c2:
-    st.write("📥 Ekspor Data")
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as w: filtered_df.to_excel(w, index=False)
-    st.download_button("Download Laporan Excel", buffer.getvalue(), "Laporan_Aset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    st.write("**Top 5 Model Laptop**")
+    if 'Model' in filtered_df.columns:
+        df_plot = filtered_df[filtered_df['Model'] != "-"]
+        top_models = df_plot['Model'].value_counts().head(5).reset_index()
+        top_models.columns = ['Model', 'Jumlah']
+        fig2 = px.bar(top_models, x='Jumlah', y='Model', orientation='h', color='Jumlah')
+        st.plotly_chart(fig2, use_container_width=True)
+
+st.markdown("---")
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as w: filtered_df.to_excel(w, index=False)
+st.download_button("📥 Download Laporan Excel", buffer.getvalue(), "Laporan_Aset.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
