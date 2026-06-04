@@ -1,45 +1,40 @@
 import streamlit as st
 import pandas as pd
-import gspread
 import plotly.express as px
-from oauth2client.service_account import ServiceAccountCredentials
 
-# Pengaturan
-SHEET_ID = "1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY"
+# Pengaturan Halaman
+st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 
-# Fungsi Koneksi
-def get_gspread_client():
-    creds_dict = st.secrets["gcp_service_account"]
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    return gspread.authorize(creds)
+# Link CSV dari Publish to Web
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-aQ2xulUo6MraDS6ohvL6BFFafR-njF45fbnKySxNkbWe12sDQhKr89Oh5k-A1Yy8SfjDPGnVvFKM/pub?output=csv"
 
 @st.cache_data(ttl=60)
 def load_data():
-    client = get_gspread_client()
-    sheet = client.open_by_key(SHEET_ID).sheet1
-    return pd.DataFrame(sheet.get_all_records())
-
-# Tampilan
-st.set_page_config(layout="wide")
-st.title("📊 Dashboard IT Asset Umara Group")
+    df = pd.read_csv(SHEET_URL)
+    df.columns = df.columns.str.strip()
+    return df
 
 df = load_data()
 
-# Chart
-col1, col2 = st.columns(2)
-with col1:
-    fig = px.pie(df, names='Status', title="Distribusi Status Aset")
-    st.plotly_chart(fig)
+# Judul
+st.title("📊 Dashboard IT Asset Umara Group")
 
-# Data Editor (Fitur Edit)
+# 1. CHART STATUS (PIE CHART)
+if "Status" in df.columns:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Distribusi Status Aset")
+        fig_status = px.pie(df, names='Status')
+        st.plotly_chart(fig_status, use_container_width=True)
+    
+    with col2:
+        st.subheader("Model Aset Terbanyak")
+        # Menghitung 5 model terbanyak
+        model_counts = df['Model'].value_counts().head(5).reset_index()
+        fig_model = px.bar(model_counts, x='count', y='Model', orientation='h')
+        st.plotly_chart(fig_model, use_container_width=True)
+
+# 2. DATA TABLE
 st.subheader("Data Inventaris")
-df_edited = st.data_editor(df, num_rows="dynamic")
-
-if st.button("💾 Simpan Perubahan"):
-    client = get_gspread_client()
-    sheet = client.open_by_key(SHEET_ID).sheet1
-    sheet.clear()
-    sheet.update([df_edited.columns.values.tolist()] + df_edited.values.tolist())
-    st.success("Data berhasil disimpan!")
-    st.rerun()
+# Kita gunakan dataframe biasa karena CSV bersifat Read-Only
+st.dataframe(df, use_container_width=True)
