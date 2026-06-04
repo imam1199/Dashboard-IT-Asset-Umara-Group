@@ -1,24 +1,29 @@
-import shutil
+import streamlit as st
+import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# Pengaturan Google Sheets
+SHEET_ID = "1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY"
+
+# Fungsi untuk koneksi (Perlu file JSON credentials dari Google Cloud Console)
+def get_gspread_client():
+    # Catatan: Di Streamlit Cloud, Anda harus menyimpan credential JSON 
+    # sebagai "Secrets" di menu dashboard Streamlit Cloud
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+    return gspread.authorize(creds)
+
+@st.cache_data(ttl=60)
+def load_data():
+    client = get_gspread_client()
+    sheet = client.open_by_key(SHEET_ID).sheet1
+    data = sheet.get_all_records()
+    return pd.DataFrame(data)
 
 def save_data(df):
-    try:
-        # 1. Simpan ke file sementara dulu
-        temp_file = "temp_laporan.xlsx"
-        df.to_excel(temp_file, index=False, engine='openpyxl')
-        
-        # 2. Paksa pindahkan file temp ke file tujuan (ini akan menimpa file lama)
-        # Jika cara ini gagal, berarti file sedang benar-benar di-lock oleh Excel desktop
-        shutil.move(temp_file, FILE_NAME) 
-        
-        st.cache_data.clear()
-        st.success("Data berhasil disinkronisasi ke Excel!")
-    except Exception as e:
-        st.error(f"Gagal Simpan! Pastikan Excel tertutup. Error: {e}")
-
-def update_df():
-    # Mengambil perubahan dari data_editor
-    if st.session_state.inventory_editor["edited_rows"]:
-        for idx, row_delta in st.session_state.inventory_editor["edited_rows"].items():
-            for col, val in row_delta.items():
-                st.session_state.df.at[int(idx), col] = val
-        save_data(st.session_state.df)
+    client = get_gspread_client()
+    sheet = client.open_by_key(SHEET_ID).sheet1
+    sheet.clear()
+    sheet.update([df.columns.values.tolist()] + df.values.tolist())
+    st.success("Data tersimpan ke Google Sheets!")
