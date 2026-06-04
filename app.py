@@ -4,59 +4,40 @@ import plotly.express as px
 
 st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 
-# Link hasil Publish to Web Anda
+# Pastikan link ini benar dan sudah di-Publish to Web
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-aQ2xulUo6MraDS6ohvL6BFFafR-njF45fbnKySxNkbWe12sDQhKr89Oh5k-A1Yy8SfJDPGnVvFKM/pub?output=csv"
 
 @st.cache_data(ttl=60)
 def load_data():
     try:
-        # Membaca data langsung dari link CSV publik
         df = pd.read_csv(SHEET_URL)
-        df.columns = df.columns.str.strip()
-        return df.fillna("-")
+        df.columns = df.columns.str.strip() # Menghapus spasi di nama kolom
+        return df
     except Exception as e:
         st.error(f"Gagal memuat data: {e}")
         return pd.DataFrame()
 
-# Load data
 df = load_data()
 
-# 2. SIDEBAR
-st.sidebar.title("Kontrol Dashboard")
-if st.sidebar.button("🔄 Refresh Data"):
-    st.cache_data.clear()
-    st.rerun()
-
-status_filter = st.sidebar.selectbox("Filter Status:", ["Semua"] + list(df["Status"].unique()))
-
-# 3. MAIN DASHBOARD
 st.title("📊 Dashboard IT Asset Umara Group")
 
-filtered_df = df.copy()
-if status_filter != "Semua":
-    filtered_df = filtered_df[filtered_df["Status"] == status_filter]
+if not df.empty and "Status" in df.columns:
+    # Sidebar Filter
+    status_options = ["Semua"] + list(df["Status"].unique())
+    status_filter = st.sidebar.selectbox("Filter Status:", status_options)
 
-# Metrik
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Total", len(filtered_df))
-col2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
-col3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
-col4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
-col5.metric("Perbaikan", len(filtered_df[filtered_df["Status"] == "Perlu Perbaikan"]))
+    filtered_df = df.copy()
+    if status_filter != "Semua":
+        filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
-st.markdown("---")
+    # Metrik
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total", len(filtered_df))
+    c2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
+    c3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
+    c4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
 
-# Menampilkan Data
-st.subheader("Data Inventaris")
-st.dataframe(filtered_df, use_container_width=True)
-
-# 4. CHART
-st.markdown("---")
-c1, c2 = st.columns(2)
-with c1:
-    fig1 = px.pie(filtered_df, names='Status', hole=0.4)
-    st.plotly_chart(fig1, use_container_width=True)
-with c2:
-    if 'Model' in filtered_df.columns:
-        fig2 = px.bar(filtered_df['Model'].value_counts().head(5), orientation='h')
-        st.plotly_chart(fig2, use_container_width=True)
+    st.subheader("Data Inventaris")
+    st.dataframe(filtered_df, use_container_width=True)
+else:
+    st.warning("Data belum berhasil dimuat atau kolom 'Status' tidak ditemukan. Pastikan Google Sheets sudah dipublish dengan benar.")
