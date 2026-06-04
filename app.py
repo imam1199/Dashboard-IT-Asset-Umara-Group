@@ -1,40 +1,54 @@
 import streamlit as st
 import pandas as pd
+import gspread
 import plotly.express as px
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Pengaturan Halaman
-st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
+st.set_page_config(layout="wide")
+st.title("📊 Dashboard IT Asset Umara Group")
 
-# Link CSV dari Publish to Web
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-aQ2xulUo6MraDS6ohvL6BFFafR-njF45fbnKySxNkbWe12sDQhKr89Oh5k-A1Yy8SfjDPGnVvFKM/pub?output=csv"
+# Koneksi ke Google Sheets (PENTING: Pastikan Secrets sudah diisi di dashboard Streamlit)
+def get_gspread_client():
+    creds_dict = st.secrets["gcp_service_account"]
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    return gspread.authorize(creds)
 
 @st.cache_data(ttl=60)
 def load_data():
-    df = pd.read_csv(SHEET_URL)
-    df.columns = df.columns.str.strip()
-    return df
+    client = get_gspread_client()
+    sheet = client.open_by_key("1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY").sheet1
+    return pd.DataFrame(sheet.get_all_records())
 
 df = load_data()
 
-# Judul
-st.title("📊 Dashboard IT Asset Umara Group")
+# 1. FITUR SEARCH
+search = st.text_input("🔍 Cari Aset (berdasarkan Model atau Serial Number):")
+if search:
+    df = df[df.apply(lambda row: search.lower() in str(row['Model']).lower() or search.lower() in str(row['Serial Number']).lower(), axis=1)]
 
-# 1. CHART STATUS (PIE CHART)
-if "Status" in df.columns:
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Distribusi Status Aset")
-        fig_status = px.pie(df, names='Status')
-        st.plotly_chart(fig_status, use_container_width=True)
-    
-    with col2:
-        st.subheader("Model Aset Terbanyak")
-        # Menghitung 5 model terbanyak
-        model_counts = df['Model'].value_counts().head(5).reset_index()
-        fig_model = px.bar(model_counts, x='count', y='Model', orientation='h')
-        st.plotly_chart(fig_model, use_container_width=True)
-
-# 2. DATA TABLE
+# 2. DATA EDITOR (Edit, Tambah, Hapus ada di sini)
 st.subheader("Data Inventaris")
-# Kita gunakan dataframe biasa karena CSV bersifat Read-Only
-st.dataframe(df, use_container_width=True)
+df_edited = st.data_editor(df, num_rows="dynamic", use_container_width=True)
+
+# 3. TOMBOL SAVE
+if st.button("💾 Simpan Perubahan ke Google Sheets"):
+    client = get_gspread_client()
+    sheet = client.open_by_key("1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY").sheet1
+    sheet.clear()
+    sheet.update([df_edited.columns.values.tolist()] + df_edited.values.tolist())
+    st.success("Data berhasil disimpan!")
+    st.cache_data.clear()
+    st.rerun()
+
+st.markdown("---")
+
+# 4. CHART (Pindah ke bawah)
+st.subheader("Visualisasi Data")
+col1, col2 = st.columns(2)
+with col1:
+    fig1 = px.pie(df_edited, names='Status', title="Distribusi Status Aset")
+    st.plotly_chart(fig1, use_container_width=True)
+with col2:
+    fig2 = px.bar(df_edited['Model'].value_counts().head(5), title="Top 5 Model Aset")
+    st.plotly_chart(fig2, use_container_width=True)
