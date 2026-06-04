@@ -16,22 +16,19 @@ def get_gspread_client():
 st.title("Dashboard IT Asset Umara Group")
 st.markdown("---")
 
-# 1. Opsi Upload Manual (Backup)
+# Opsi Upload File (Backup)
 st.subheader("Opsi Upload File (Jika koneksi Sheets error)")
 uploaded_file = st.file_uploader("Upload file Excel (.xlsx)", type=["xlsx"])
 
-# 2. Logika Pemanggilan Data
+# Logika Pemanggilan Data
 df = None
 
 if uploaded_file is not None:
-    # Mode Upload
     df = pd.read_excel(uploaded_file)
     st.info("Menggunakan data dari file yang di-upload.")
 else:
-    # Mode Google Sheets
     try:
         client = get_gspread_client()
-        # GANTI ID INI DENGAN ID GOOGLE SHEET ASLI KAMU!
         SHEET_ID = "1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY"
         sheet = client.open_by_key(SHEET_ID).sheet1 
         data = sheet.get_all_records()
@@ -41,14 +38,15 @@ else:
         st.error(f"Belum bisa terhubung ke Sheets: {e}")
         st.warning("Silakan upload file Excel di atas untuk mulai mengedit.")
 
-# 3. Menampilkan dan Mengedit Data
+# Menampilkan dan Mengedit Data
 if df is not None:
     edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 
     if st.button("Simpan Perubahan"):
         if uploaded_file is None:
-            # Simpan balik ke Google Sheets
             try:
+                client = get_gspread_client()
+                sheet = client.open_by_key("1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY").sheet1
                 sheet.clear()
                 data_to_update = [edited_df.columns.values.tolist()] + edited_df.values.tolist()
                 sheet.update(range_name='A1', values=data_to_update)
@@ -57,4 +55,4 @@ if df is not None:
             except Exception as e:
                 st.error(f"Gagal simpan ke Sheets: {e}")
         else:
-            st.warning("Perubahan tidak tersimpan permanen (mode upload).")
+            st.warning("Perubahan tidak tersimpan permanen dalam mode upload.")
