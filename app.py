@@ -4,28 +4,33 @@ import plotly.express as px
 
 st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
 
-# Pastikan link ini benar dan sudah di-Publish to Web
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-aQ2xulUo6MraDS6ohvL6BFFafR-njF45fbnKySxNkbWe12sDQhKr89Oh5k-A1Yy8SfJDPGnVvFKM/pub?output=csv"
+# Link Google Sheets yang sudah di-Publish (format CSV)
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-aQ2xulUo6MraDS6ohvL6BFFafR-njF45fbnKySxNkbWe12sDQhKr89Oh5k-A1Yy8SfjDPGnVvFKM/pub?output=csv"
 
 @st.cache_data(ttl=60)
 def load_data():
     try:
+        # Membaca data langsung dari link CSV publik
         df = pd.read_csv(SHEET_URL)
-        df.columns = df.columns.str.strip() # Menghapus spasi di nama kolom
+        # Menghapus spasi di nama kolom agar tidak error saat diakses
+        df.columns = df.columns.str.strip()
         return df
     except Exception as e:
         st.error(f"Gagal memuat data: {e}")
         return pd.DataFrame()
 
+# Load data
 df = load_data()
 
 st.title("📊 Dashboard IT Asset Umara Group")
 
+# Pastikan data tidak kosong sebelum diolah
 if not df.empty and "Status" in df.columns:
     # Sidebar Filter
-    status_options = ["Semua"] + list(df["Status"].unique())
+    status_options = ["Semua"] + list(df["Status"].dropna().unique())
     status_filter = st.sidebar.selectbox("Filter Status:", status_options)
 
+    # Filter Data
     filtered_df = df.copy()
     if status_filter != "Semua":
         filtered_df = filtered_df[filtered_df["Status"] == status_filter]
@@ -40,4 +45,4 @@ if not df.empty and "Status" in df.columns:
     st.subheader("Data Inventaris")
     st.dataframe(filtered_df, use_container_width=True)
 else:
-    st.warning("Data belum berhasil dimuat atau kolom 'Status' tidak ditemukan. Pastikan Google Sheets sudah dipublish dengan benar.")
+    st.info("Data sedang dimuat atau kolom 'Status' tidak ditemukan. Pastikan link Google Sheets sudah benar.")
