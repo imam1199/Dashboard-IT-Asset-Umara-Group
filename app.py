@@ -1,48 +1,45 @@
 import streamlit as st
 import pandas as pd
+import gspread
 import plotly.express as px
+from oauth2client.service_account import ServiceAccountCredentials
 
-st.set_page_config(layout="wide", page_title="IT Asset Umara Group")
+# Pengaturan
+SHEET_ID = "1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY"
 
-# Link Google Sheets yang sudah di-Publish (format CSV)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-aQ2xulUo6MraDS6ohvL6BFFafR-njF45fbnKySxNkbWe12sDQhKr89Oh5k-A1Yy8SfjDPGnVvFKM/pub?output=csv"
+# Fungsi Koneksi
+def get_gspread_client():
+    creds_dict = st.secrets["gcp_service_account"]
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    return gspread.authorize(creds)
 
 @st.cache_data(ttl=60)
 def load_data():
-    try:
-        # Membaca data langsung dari link CSV publik
-        df = pd.read_csv(SHEET_URL)
-        # Menghapus spasi di nama kolom agar tidak error saat diakses
-        df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Gagal memuat data: {e}")
-        return pd.DataFrame()
+    client = get_gspread_client()
+    sheet = client.open_by_key(SHEET_ID).sheet1
+    return pd.DataFrame(sheet.get_all_records())
 
-# Load data
-df = load_data()
-
+# Tampilan
+st.set_page_config(layout="wide")
 st.title("📊 Dashboard IT Asset Umara Group")
 
-# Pastikan data tidak kosong sebelum diolah
-if not df.empty and "Status" in df.columns:
-    # Sidebar Filter
-    status_options = ["Semua"] + list(df["Status"].dropna().unique())
-    status_filter = st.sidebar.selectbox("Filter Status:", status_options)
+df = load_data()
 
-    # Filter Data
-    filtered_df = df.copy()
-    if status_filter != "Semua":
-        filtered_df = filtered_df[filtered_df["Status"] == status_filter]
+# Chart
+col1, col2 = st.columns(2)
+with col1:
+    fig = px.pie(df, names='Status', title="Distribusi Status Aset")
+    st.plotly_chart(fig)
 
-    # Metrik
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total", len(filtered_df))
-    c2.metric("Tersedia", len(filtered_df[filtered_df["Status"] == "Tersedia"]))
-    c3.metric("Di Pakai", len(filtered_df[filtered_df["Status"] == "Di Pakai"]))
-    c4.metric("Rusak", len(filtered_df[filtered_df["Status"] == "Rusak"]))
+# Data Editor (Fitur Edit)
+st.subheader("Data Inventaris")
+df_edited = st.data_editor(df, num_rows="dynamic")
 
-    st.subheader("Data Inventaris")
-    st.dataframe(filtered_df, use_container_width=True)
-else:
-    st.info("Data sedang dimuat atau kolom 'Status' tidak ditemukan. Pastikan link Google Sheets sudah benar.")
+if st.button("💾 Simpan Perubahan"):
+    client = get_gspread_client()
+    sheet = client.open_by_key(SHEET_ID).sheet1
+    sheet.clear()
+    sheet.update([df_edited.columns.values.tolist()] + df_edited.values.tolist())
+    st.success("Data berhasil disimpan!")
+    st.rerun()
