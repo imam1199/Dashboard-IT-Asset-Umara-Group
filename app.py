@@ -26,17 +26,6 @@ client = get_gspread_client()
 
 if client:
     try:
-        sheet = client.open_by_key("1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY").sheet1
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
-        
-        if st.button("Simpan Perubahan"):
-            sheet.clear()
-            sheet.update(range_name='A1', values=[edited_df.columns.tolist()] + edited_df.values.tolist())
-            st.success("Data berhasil disimpan!")
-            st.rerun()
-    except Exception as e:
-        st.error(f"Error: {e}")
-else:
-    st.warning("Gagal terhubung ke Google Sheet. Pastikan Email Service Account sudah di-Share sebagai Editor.")
+        # Menampilkan loading saat mengambil data
+        with st.spinner('Sedang mengambil data dari Google Sheets...'):
+            sheet = client.open_by_key("1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY").sheet1
