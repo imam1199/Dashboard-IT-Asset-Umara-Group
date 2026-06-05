@@ -8,7 +8,7 @@ st.set_page_config(page_title="Dashboard IT Asset", layout="wide")
 @st.cache_resource
 def get_gspread_client():
     try:
-        # PENTING: Memperbaiki format kunci agar \n terbaca sebagai baris baru
+        # Mengambil key dari secrets dan memperbaiki format \n
         raw_key = st.secrets["GCP_PRIVATE_KEY"]
         private_key = raw_key.replace("\\n", "\n")
         
@@ -34,7 +34,6 @@ def get_gspread_client():
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         return gspread.authorize(creds)
     except Exception as e:
-        # Menampilkan detail error di log untuk diagnosa
         st.error(f"Error Auth: {e}")
         return None
 
