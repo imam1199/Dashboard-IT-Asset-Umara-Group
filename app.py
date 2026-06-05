@@ -8,14 +8,14 @@ st.set_page_config(page_title="Dashboard IT Asset", layout="wide")
 @st.cache_resource
 def get_gspread_client():
     try:
-        # Kita menggunakan file fisik 'service_account.json' yang ada di folder proyekmu
+        # Nama file diubah dari 'service_account.json' menjadi 'gcp_creds.json'
         scope = [
             'https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive',
             'https://www.googleapis.com/auth/spreadsheets'
         ]
-        # Membaca file langsung (lebih stabil dari Secrets)
-        creds = ServiceAccountCredentials.from_json_keyfile_name('service_account.json', scope)
+        # Membaca file gcp_creds.json yang sudah ada di GitHub kamu
+        creds = ServiceAccountCredentials.from_json_keyfile_name('gcp_creds.json', scope)
         return gspread.authorize(creds)
     except Exception as e:
         st.error(f"Error saat memuat kredensial: {e}")
@@ -47,4 +47,4 @@ if client:
     except Exception as e:
         st.error(f"Error tak terduga: {e}")
 else:
-    st.warning("Client belum siap. Pastikan file 'service_account.json' sudah di-upload ke GitHub.")
+    st.warning("Client belum siap. Pastikan file 'gcp_creds.json' ada di repository GitHub.")
