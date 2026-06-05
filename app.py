@@ -7,13 +7,18 @@ from oauth2client.service_account import ServiceAccountCredentials
 @st.cache_resource
 def get_gspread_client():
     try:
-        # Membaca credentials dari secrets sebagai JSON
-        creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"])
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        # Membaca file JSON langsung dari folder proyek
+        # Pastikan nama filenya persis sama
+        json_file = 'dashboard-laptop-it-f2733e150461.json'
+        
+        scope = [
+            'https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive',
+            'https://spreadsheets.google.com/spreadsheets'
+        ]
+        
+        creds = ServiceAccountCredentials.from_json_keyfile_name(json_file, scope)
         return gspread.authorize(creds)
     except Exception as e:
-        st.error(f"Error Auth: {e}")
+        st.error(f"Error: {e}")
         return None
-
-# ... (sisa kodinganmu)
