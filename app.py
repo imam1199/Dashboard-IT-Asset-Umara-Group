@@ -8,7 +8,7 @@ st.set_page_config(page_title="Dashboard IT Asset", layout="wide")
 @st.cache_resource
 def get_gspread_client():
     try:
-        # Data kredensial langsung di dalam kode
+        # Kita gunakan dictionary untuk mengonfigurasi kredensial
         creds_dict = {
             "type": "service_account",
             "project_id": "dashboard-laptop-it",
@@ -24,6 +24,7 @@ def get_gspread_client():
         }
         
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
+        # Menggunakan from_json_keyfile_dict untuk membaca langsung dari dictionary
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         return gspread.authorize(creds)
     except Exception as e:
@@ -36,14 +37,18 @@ client = get_gspread_client()
 if client:
     try:
         sheet = client.open_by_key("1msf4IK1ZJReQl5f_6VRbVCsGiJXcHUHENto1DqrQwkY").sheet1
-        df = pd.DataFrame(sheet.get_all_records())
-        edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
-        if st.button("Simpan Perubahan"):
-            sheet.clear()
-            sheet.update(range_name='A1', values=[edited_df.columns.tolist()] + edited_df.values.tolist())
-            st.success("Data tersimpan!")
-            st.rerun()
+        data = sheet.get_all_records()
+        if data:
+            df = pd.DataFrame(data)
+            edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
+            if st.button("Simpan Perubahan"):
+                sheet.clear()
+                sheet.update(range_name='A1', values=[edited_df.columns.tolist()] + edited_df.values.tolist())
+                st.success("Data tersimpan!")
+                st.rerun()
+        else:
+            st.info("Sheet kosong.")
     except Exception as e:
         st.error(f"Error Sheets: {e}")
 else:
-    st.warning("Client belum siap. Periksa email share-nya.")
+    st.warning("Client gagal dibuat. Pastikan kodingan sudah benar.")
